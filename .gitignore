@@ -35,7 +35,7 @@ venv/
 arabert-ner-hadith/
 arabert-ner-hadith-final/
 model/
-models/
+
 
 # Tokenizers
 tokenizer.json
