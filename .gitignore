@@ -1,0 +1,109 @@
+# ------------------------------
+# 🧠 PYTHON / ENVIRONNEMENT
+# ------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+*.so
+
+# Environnements virtuels
+env/
+venv/
+.venv/
+*/venv/
+*/env/
+*.conda
+*.env
+
+# ------------------------------
+# 🤖 HUGGINGFACE / TRANSFORMERS
+# ------------------------------
+# Modèles téléchargés
+*.bin
+*.safetensors
+*.pt
+
+# Dossiers modèles HuggingFace
+arabert-ner-hadith/
+arabert-ner-hadith-final/
+model/
+models/
+
+# Tokenizers
+tokenizer.json
+tokenizer_config.json
+vocab.txt
+special_tokens_map.json
+
+# ------------------------------
+# 📊 LOGS & TENSORBOARD
+# ------------------------------
+logs/
+runs/
+events.out.tfevents.*
+
+# TensorBoard temp files
+*.tfevents.*
+*/tfevents.*
+
+# ------------------------------
+# 📁 DONNÉES / DATASETS
+# ------------------------------
+data/*.csv
+data/*.txt
+data/*.json
+data/*.tsv
+data/tmp/
+data/cache/
+*.cache
+
+# UTF converted copies
+*_utf8.json
+
+# ------------------------------
+# 🧪 CHECKPOINTS / TRAINING
+# ------------------------------
+checkpoint/
+checkpoints/
+training_checkpoints/
+output/
+outputs/
+
+# HuggingFace Trainer output
+*/checkpoint-*/
+trainer_state.json
+trainer_log.json
+
+# ------------------------------
+# ⚙️ IDE / WSL / VSCODE FILES
+# ------------------------------
+.vscode/
+history/
+*.code-workspace
+
+# WSL cache
+*.swp
+*.swo
+
+# ------------------------------
+#  SÉCURITÉ / CLÉS
+# ------------------------------
+*.pem
+*.key
+*.credentials
+*.token
+*.db
+
+# ------------------------------
+# 🚫 AUTRES FICHIERS À IGNORER
+# ------------------------------
+.DS_Store
+Thumbs.db
