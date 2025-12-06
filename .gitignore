@@ -23,7 +23,24 @@ venv/
 *.conda
 *.env
 
+# ------------------------------
+#  HUGGINGFACE / TRANSFORMERS
+# ------------------------------
+# Modèles téléchargés
+*.bin
+*.safetensors
+*.pt
 
+# Dossiers modèles HuggingFace
+arabert-ner-hadith/
+model/
+
+
+# Tokenizers
+tokenizer.json
+tokenizer_config.json
+vocab.txt
+special_tokens_map.json
 
 # ------------------------------
 #  LOGS & TENSORBOARD
