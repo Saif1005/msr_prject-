@@ -32,10 +32,14 @@ class NERTrainer:
         )
         
         self.trainer = None
+        self.tokenized_dataset = None  # IMPORTANT : attribut déclaré ici
+        
         
     def setup_trainer(self, tokenized_dataset: DatasetDict) -> None:
-        """Configure le Trainer Hugging Face"""
+        """Configure le Trainer HuggingFace"""
         
+        # Stocker le dataset pour pouvoir l'utiliser dans evaluate()
+        self.tokenized_dataset = tokenized_dataset
         
         training_args = TrainingArguments(
             output_dir=self.config.output_dir,
@@ -63,23 +67,32 @@ class NERTrainer:
             compute_metrics=self.metrics_calculator.compute_metrics
         )
     
+    
     def train(self) -> None:
         """Lance l'entraînement"""
         print("\n🚀 Démarrage de l'entraînement...")
         self.trainer.train()
-        print("   ✅ Entraînement terminé")
+        print("✅ Entraînement terminé")
+    
     
     def evaluate(self, dataset_split: str = "test") -> Dict:
         """
-        Évalue le modèle
-        
+        Évalue le modèle sur validation ou test.
+
         Args:
             dataset_split: 'validation' ou 'test'
-            
-        Returns:
-            Dictionnaire des métriques
         """
         print(f"\n📊 Évaluation sur {dataset_split}...")
-        results = self.trainer.evaluate()
+
+        # Vérification des choix possibles
+        if dataset_split not in ["validation", "test"]:
+            raise ValueError("dataset_split must be 'validation' or 'test'")
+
+        # Sélection du dataset de validation ou test
+        eval_ds = self.tokenized_dataset[dataset_split]
+
+        # Exécuter l'évaluation
+        results = self.trainer.evaluate(eval_dataset=eval_ds)
+
         print(f"   Results: {results}")
         return results

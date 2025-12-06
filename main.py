@@ -1,32 +1,36 @@
 """
-Script principal pour le fine-tuning AraBERT NER
+Script principal pour le fine-tuning AraBERT NER (multi-source)
 """
+
 from config.config import Config
-from data.dataset_loader import NERDatasetLoader
+from data.dataset_loader import MultiSourceNERLoader   # ⭐ change ici
 from models.ner_model import AraBERTNER
 from training.trainer import NERTrainer
 from evaluation.evaluator import NEREvaluator
-from visualization.plotter import MetricsPlotter  # 🆕
-from utils.metrics import NERMetrics  # 🆕
+from visualization.plotter import MetricsPlotter
+from utils.metrics import NERMetrics
 import numpy as np
 
 
 def main():
     """Pipeline complet de fine-tuning"""
-    
-    print("="*60)
-    print("   ARABERT FINE-TUNING — CLASSICAL ARABIC NER")
-    print("="*60)
-    
-    # 1. Chargement de la configuration
+
+    print("=" * 60)
+    print("      ARABERT FINE-TUNING — MULTI-SOURCE NER")
+    print("=" * 60)
+
+    # ----------------------------------------------------------
+    # 1️⃣ Charger la configuration globale
+    # ----------------------------------------------------------
     config = Config()
-    
-    # 2. Chargement et préparation des données
-   # 2. Chargement et préparation des données
+
+    # ----------------------------------------------------------
+    # 2️⃣ Chargement & préparation du dataset multi-source
+    # ----------------------------------------------------------
     print("\n=== Préparation du dataset NER ===")
 
-    dataset_loader = NERDatasetLoader(
-        data_path=config.data.data_path,
+    dataset_loader = MultiSourceNERLoader(
+        paths=config.data.data_paths,
         train_split=config.data.train_split,
         val_split=config.data.val_split,
         random_state=config.data.random_state
@@ -41,54 +45,66 @@ def main():
     print(f"Val size      : {metadata['val_size']}")
     print(f"Test size     : {metadata['test_size']}")
 
-    
-    # 3. Chargement du modèle AraBERT
+    # ----------------------------------------------------------
+    # 3️⃣ Chargement du modèle AraBERT
+    # ----------------------------------------------------------
     model = AraBERTNER(
         model_checkpoint=config.model.model_checkpoint,
-        num_labels=metadata['num_labels'],
-        id2label=metadata['id2label'],
-        label2id=metadata['label2id'],
+        num_labels=metadata["num_labels"],
+        id2label=metadata["id2label"],
+        label2id=metadata["label2id"],
         max_length=config.model.max_length
     )
-    
-    # 4. Tokenization
-    print("\n🔤 Tokenization des données...")
-    tokenized_dataset = dataset.map(
-        model.tokenize_and_align_labels,
-        batched=True,
-        remove_columns=dataset["train"].column_names
-    )
-    print("   ✅ Tokenization terminée")
-    
-    # 5. Configuration du Trainer
+
+    # ----------------------------------------------------------
+    # 4️⃣ Tokenization + alignement labels
+    # ----------------------------------------------------------
+    print("\n=== Tokenization des données ===")
+
+    tokenized_dataset = model.prepare_dataset(dataset)   # ⭐ use méthode interne
+    print("    Tokenization terminée")
+
+    # ----------------------------------------------------------
+    # 5️⃣ Configuration du Trainer HF
+    # ----------------------------------------------------------
     trainer = NERTrainer(model, config.training)
     trainer.setup_trainer(tokenized_dataset)
-    
-    # 6. Entraînement
+
+    # ----------------------------------------------------------
+    # 6️⃣ Entraînement
+    # ----------------------------------------------------------
     trainer.train()
-    
-    # 7. Évaluation sur le test set
+
+    # ----------------------------------------------------------
+    # 7️⃣ Évaluation : test set
+    # ----------------------------------------------------------
     test_results = trainer.evaluate(dataset_split="test")
-    
-    # 8. Rapport de classification détaillé
-    evaluator = NEREvaluator(trainer.trainer, metadata['id2label'])
+
+
+    # ----------------------------------------------------------
+    # 8️⃣ Rapport Classification (seqeval)
+    # ----------------------------------------------------------
+    print("\n=== Rapport détaillé ===")
+
+    evaluator = NEREvaluator(trainer.trainer, metadata["id2label"])
     report = evaluator.generate_classification_report(tokenized_dataset)
     evaluator.save_report(report, "./classification_report.txt")
-    
-    # 🆕 9. GÉNÉRATION DES VISUALISATIONS
-    print("\n" + "="*60)
-    print("   GÉNÉRATION DES VISUALISATIONS")
-    print("="*60)
-    
+
+    # ----------------------------------------------------------
+    # 9️⃣ Visualisations (courbes, heatmaps, cm)
+    # ----------------------------------------------------------
+    print("\n" + "=" * 60)
+    print("        GÉNÉRATION DES VISUALISATIONS")
+    print("=" * 60)
+
     plotter = MetricsPlotter(output_dir="./plots")
-    
-    # Extraire true_labels et pred_labels pour la confusion matrix
+
     predictions, labels, _ = trainer.trainer.predict(tokenized_dataset["test"])
+
     true_predictions, true_labels = NERMetrics.get_predictions_and_labels(
-        predictions, labels, metadata['id2label']
+        predictions, labels, metadata["id2label"]
     )
-    
-    # Générer tous les plots
+
     plotter.generate_all_plots(
         trainer=trainer.trainer,
         dataset=dataset,
@@ -97,20 +113,14 @@ def main():
         true_labels=true_labels,
         pred_labels=true_predictions
     )
-    
-    # 10. Sauvegarde du modèle final
+
+    # ----------------------------------------------------------
+    # 🔟 Sauvegarde modèle final
+    # ----------------------------------------------------------
     model.save(config.final_model_path)
-    
-    # 11. Test d'inférence
-    print("\n🔍 Test d'inférence:")
-    test_text = "قال رسول الله صلى الله عليه وسلم"
-    predictions = model.predict(test_text)
-    for token, label in predictions:
-        print(f"   {token}: {label}")
-    
-    print("\n" + "="*60)
-    print("   ✅ PIPELINE TERMINÉ AVEC SUCCÈS")
-    print("="*60)
+
+    print("\n🎉 Pipeline complet terminé avec succès !")
+    print(f"📁 Modèle enregistré dans : {config.final_model_path}")
 
 
 if __name__ == "__main__":

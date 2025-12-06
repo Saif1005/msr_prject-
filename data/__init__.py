@@ -1,1 +1,1 @@
-from .dataset_loader import NERDatasetLoader
+from .dataset_loader import MultiSourceNERLoader

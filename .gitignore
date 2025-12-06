@@ -1,5 +1,5 @@
 # ------------------------------
-# 🧠 PYTHON / ENVIRONNEMENT
+#  PYTHON / ENVIRONNEMENT
 # ------------------------------
 __pycache__/
 *.py[cod]
@@ -23,28 +23,10 @@ venv/
 *.conda
 *.env
 
-# ------------------------------
-# 🤖 HUGGINGFACE / TRANSFORMERS
-# ------------------------------
-# Modèles téléchargés
-*.bin
-*.safetensors
-*.pt
 
-# Dossiers modèles HuggingFace
-arabert-ner-hadith/
-arabert-ner-hadith-final/
-model/
-
-
-# Tokenizers
-tokenizer.json
-tokenizer_config.json
-vocab.txt
-special_tokens_map.json
 
 # ------------------------------
-# 📊 LOGS & TENSORBOARD
+#  LOGS & TENSORBOARD
 # ------------------------------
 logs/
 runs/
@@ -55,7 +37,7 @@ events.out.tfevents.*
 */tfevents.*
 
 # ------------------------------
-# 📁 DONNÉES / DATASETS
+#  DONNÉES / DATASETS
 # ------------------------------
 data/*.csv
 data/*.txt
@@ -69,7 +51,7 @@ data/cache/
 *_utf8.json
 
 # ------------------------------
-# 🧪 CHECKPOINTS / TRAINING
+#  CHECKPOINTS / TRAINING
 # ------------------------------
 checkpoint/
 checkpoints/
@@ -83,7 +65,7 @@ trainer_state.json
 trainer_log.json
 
 # ------------------------------
-# ⚙️ IDE / WSL / VSCODE FILES
+#  IDE / WSL / VSCODE FILES
 # ------------------------------
 .vscode/
 history/
@@ -103,7 +85,7 @@ history/
 *.db
 
 # ------------------------------
-# 🚫 AUTRES FICHIERS À IGNORER
+#  AUTRES FICHIERS À IGNORER
 # ------------------------------
 .DS_Store
 Thumbs.db

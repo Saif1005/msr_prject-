@@ -1,133 +1,171 @@
 """
-Gestion du modèle AraBERT pour NER
+Version améliorée d'AraBERTNER :
+ - Compatible CANERCorpus + ANERCorp
+ - Compatible mapping dynamique label2id / id2label
+ - Préparation complète du dataset multi-source
+ - Tokenization + alignment intégré
+ - Prediction améliorée
 """
 import torch
 from transformers import (
     AutoTokenizer,
-    AutoModelForTokenClassification
+    AutoModelForTokenClassification,
+    DataCollatorForTokenClassification,
 )
 from typing import Dict, List, Tuple
+from datasets import DatasetDict
+from .singleton import ModelSingleton
 
 
 class AraBERTNER:
-    """Classe wrapper pour le modèle AraBERT NER"""
-    
-    def __init__(self, model_checkpoint: str, num_labels: int,
-                 id2label: Dict, label2id: Dict, max_length: int = 128):
+    """Gestion du modèle AraBERT pour NER multi-source"""
+
+    def __init__(
+        self,
+        model_checkpoint: str,
+        num_labels: int,
+        id2label: Dict,
+        label2id: Dict,
+        max_length: int = 128,
+    ):
         """
         Args:
-            model_checkpoint: Nom du modèle pré-entraîné
-            num_labels: Nombre de classes NER
-            id2label: Mapping id -> label
-            label2id: Mapping label -> id
-            max_length: Longueur max des séquences
+            model_checkpoint: nom du modèle HF
+            num_labels: nombre total de labels NER
+            id2label: mapping id → label
+            label2id: mapping label → id
+            max_length: longueur max de tokenizer
         """
+
         self.model_checkpoint = model_checkpoint
         self.num_labels = num_labels
         self.id2label = id2label
         self.label2id = label2id
         self.max_length = max_length
-        
+
         self.tokenizer = None
         self.model = None
-        
+
         self._load_model()
-    
-    def _load_model(self) -> None:
-        """Charge le tokenizer et le modèle"""
-        print(f"\n🤖 Chargement du modèle: {self.model_checkpoint}")
-        
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_checkpoint)
-        self.model = AutoModelForTokenClassification.from_pretrained(
-            self.model_checkpoint,
+
+    # -------------------------------------------------------------
+    # 1️ Chargement modèle + tokenizer
+    # -------------------------------------------------------------
+    def _load_model(self):
+        print(f"\nChargement du modèle en Singleton : {self.model_checkpoint}")
+
+        singleton = ModelSingleton(
+            model_checkpoint=self.model_checkpoint,
             num_labels=self.num_labels,
             id2label=self.id2label,
             label2id=self.label2id
         )
-        
-        print(f"   ✅ Modèle chargé avec {self.num_labels} classes")
-    
+
+        # Référencer le modèle dans ta classe
+        self.tokenizer = singleton.tokenizer
+        self.model = singleton.model
+
+
+    # -------------------------------------------------------------
+    # 2️ Tokenization + alignement labels mots → sous-tokens
+    # -------------------------------------------------------------
     def tokenize_and_align_labels(self, examples: Dict) -> Dict:
-        """
-        Tokenize et aligne les labels avec les subword tokens
-        
-        Args:
-            examples: Batch d'exemples avec tokens et ner_tags
-            
-        Returns:
-            Inputs tokenizés avec labels alignés
-        """
-        tokenized_inputs = self.tokenizer(
+        tokenized = self.tokenizer(
             examples["tokens"],
             truncation=True,
             is_split_into_words=True,
             padding=False,
-            max_length=self.max_length
+            max_length=self.max_length,
         )
-        
-        labels = []
-        for i, example_labels in enumerate(examples["ner_tags"]):
-            word_ids = tokenized_inputs.word_ids(batch_index=i)
-            previous_word_idx = None
-            aligned_labels = []
-            
-            for word_idx in word_ids:
-                if word_idx is None:
-                    aligned_labels.append(-100)
-                elif word_idx != previous_word_idx:
-                    aligned_labels.append(example_labels[word_idx])
+
+        all_labels = []
+
+        for i, labels in enumerate(examples["ner_tags"]):
+            word_ids = tokenized.word_ids(batch_index=i)
+
+            prev = None
+            aligned = []
+
+            for w_id in word_ids:
+                if w_id is None:
+                    aligned.append(-100)
+                elif w_id != prev:
+                    aligned.append(labels[w_id])
                 else:
-                    aligned_labels.append(-100)
-                
-                previous_word_idx = word_idx
-            
-            labels.append(aligned_labels)
-        
-        tokenized_inputs["labels"] = labels
-        return tokenized_inputs
-    
+                    aligned.append(-100)
+
+                prev = w_id
+
+            all_labels.append(aligned)
+
+        tokenized["labels"] = all_labels
+        return tokenized
+
+    # -------------------------------------------------------------
+    # 3️ Préparation du dataset fusionné (CANER + ANER)
+    # -------------------------------------------------------------
+    def prepare_dataset(self, dataset: DatasetDict) -> DatasetDict:
+        """
+        Prépare train/val/test via tokenization + alignement.
+        """
+        print("\n Préparation du dataset fusionné pour AraBERT...")
+
+        tokenized_dataset = dataset.map(
+            self.tokenize_and_align_labels,
+            batched=True,
+            remove_columns=dataset["train"].column_names,
+            desc="Tokenisation NER",
+        )
+
+        self.data_collator = DataCollatorForTokenClassification(self.tokenizer)
+
+        print("    Dataset prêt pour l'entraînement AraBERT")
+        return tokenized_dataset
+
+    # -------------------------------------------------------------
+    # 4️ Prédiction unitaire
+    # -------------------------------------------------------------
     def predict(self, text: str) -> List[Tuple[str, str]]:
-        """
-        Prédiction NER sur un texte
-        
-        Args:
-            text: Texte en arabe
-            
-        Returns:
-            Liste de (token, label)
-        """
         inputs = self.tokenizer(text, return_tensors="pt", truncation=True)
-        
+
         with torch.no_grad():
             outputs = self.model(**inputs)
-        
-        predictions = torch.argmax(outputs.logits, dim=2)
+
+        preds = torch.argmax(outputs.logits, dim=2)
         tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
-        labels_pred = [self.id2label[p.item()] for p in predictions[0]]
-        
-        return [
-            (tok, lab) for tok, lab in zip(tokens, labels_pred)
-            if tok not in ["[CLS]", "[SEP]", "[PAD]"]
-        ]
-    
-    def save(self, output_path: str) -> None:
-        """Sauvegarde le modèle et le tokenizer"""
-        print(f"\n💾 Sauvegarde du modèle: {output_path}")
-        self.model.save_pretrained(output_path)
-        self.tokenizer.save_pretrained(output_path)
-        print("   ✅ Modèle sauvegardé")
-    
+
+        labels = [self.id2label[p.item()] for p in preds[0]]
+
+        # supprimer tokens spéciaux
+        result = []
+        for tok, lab in zip(tokens, labels):
+            if tok not in ["[CLS]", "[SEP]", "[PAD]"]:
+                result.append((tok, lab))
+
+        return result
+
+    # -------------------------------------------------------------
+    # 5️ Sauvegarde
+    # -------------------------------------------------------------
+    def save(self, path: str):
+        print(f"\n Sauvegarde modèle dans : {path}")
+        self.model.save_pretrained(path)
+        self.tokenizer.save_pretrained(path)
+        print("  Sauvegarde terminée")
+
+    # -------------------------------------------------------------
+    # 6️ Chargement custom depuis checkpoint
+    # -------------------------------------------------------------
     @classmethod
-    def load_from_checkpoint(cls, checkpoint_path: str) -> 'AraBERTNER':
-        """Charge un modèle depuis un checkpoint"""
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
-        model = AutoModelForTokenClassification.from_pretrained(checkpoint_path)
-        
-        instance = cls.__new__(cls)
-        instance.tokenizer = tokenizer
-        instance.model = model
-        instance.id2label = model.config.id2label
-        instance.label2id = model.config.label2id
-        instance.num_labels = model.config.num_labels
-        
-        return instance
+    def load_from_checkpoint(cls, path: str) -> "AraBERTNER":
+        tokenizer = AutoTokenizer.from_pretrained(path)
+        model = AutoModelForTokenClassification.from_pretrained(path)
+
+        inst = cls.__new__(cls)
+        inst.tokenizer = tokenizer
+        inst.model = model
+        inst.id2label = model.config.id2label
+        inst.label2id = model.config.label2id
+        inst.num_labels = model.config.num_labels
+
+        return inst
