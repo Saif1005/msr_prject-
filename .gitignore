@@ -34,7 +34,7 @@ venv/
 # Dossiers modèles HuggingFace
 arabert-ner-hadith/
 model/
-
+arabert-ner-hadith-final/
 
 # Tokenizers
 tokenizer.json
