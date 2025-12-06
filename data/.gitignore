@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+*.so
